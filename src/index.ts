@@ -1,3 +1,11 @@
+import { HelperFunctions } from "./utils/helper.js";
+
+type TTable = {
+    players: Card[][];
+    gameMode: string;
+    deck: Deck;
+}
+
 class Card {
     suit: string
     value: string
@@ -17,18 +25,21 @@ class Card {
 class Deck {
     deck: Card[]
 
-    constructor() {
-        this.deck = Deck.generateDeck();
+    constructor(gameMode: string | null = null) {
+        this.deck = Deck.generateDeck(gameMode);
     }
 
-    static generateDeck() {
+    static generateDeck(gameMode: string | null = null) {
         let newDeck = [];
         const suits = ["♣", "♦", "♥", "♠"];
-        const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+        const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+        const blackJack: {[value: string] : number} = {"A":1, "J":10,"Q":10,"K":10};
 
         for (let i = 0; i < suits.length; i++) {
             for (let j = 0; j < values.length; j++) {
-                newDeck.push(new Card(suits[i], values[j], j + 1));
+                let currentValue = values[j];
+                let intValue = (gameMode === "21") ? (currentValue in blackJack ? blackJack[currentValue] : parseInt(currentValue)) : j + 1;
+                newDeck.push(new Card(suits[i], values[j], intValue));
             }
         }
         return newDeck;
@@ -57,27 +68,89 @@ class Deck {
 }
 
 class Dealer {
-    static startGame(amountOfPlayers: number) {
+    static startGame(amountOfPlayers: number, gameMode: string) {
         let table = {
             "players": [] as Card[][],
-            "deck": new Deck()
+            "gameMode": gameMode,
+            "deck": new Deck(gameMode)
         }
 
         table["deck"].shuffleDeck()
 
         for(let i = 0; i < amountOfPlayers; i++) {
             let playerCard = []
-            // ブラックジャックの手札は2枚
-            for (let j = 0; j < 2; j++) {
+            for (let j = 0; j < Dealer.initialCards(gameMode); j++) {
                 playerCard.push(table["deck"].draw());
             }
 
             table["players"].push(playerCard);
         }
 
-        return table["players"]
+        return table
+    }
+
+    static initialCards(gameMode: string): number {
+        if(gameMode === "21") {
+            return 2
+        }
+
+        if(gameMode === "poker") {
+            return 5
+        }
+
+        return 0
+    }
+
+    static printTableInformation(table: TTable) {
+        console.log("Amount of players: " + String(table["players"].length) + "... Game mode: " + table["gameMode"] + ". At this table: ")
+
+        for(let i = 0; i < table["players"].length; i++ ) {
+            console.log("Player " + (i + 1) + " hand is: ");
+            for(let j = 0; j < table["players"][i].length; j++) {
+                console.log(table["players"][i][j].getCardString())
+            }
+        }
+    }
+
+    static score21Individual(cards: Card[]) {
+        let value = 0;
+        for (let i = 0; i < cards.length; i++) {
+            value += cards[i].intValue;
+        }
+        console.log(value)
+        if (value > 21) value = 0;
+        return value;
+    }
+
+    static winnerOf21(table: TTable) {
+        let points = [];
+        let cache = [];
+        for (let i = 0; i < table["players"].length; i++) {
+            let point = Dealer.score21Individual(table["players"][i]);
+            points.push(point);
+
+            if (cache[point] >= 1) cache[point] += 1;
+            else cache[point] = 1;
+        }
+
+
+        let winnerIndex = HelperFunctions.maxInArrayIndex(points);
+        if (cache[points[winnerIndex]] > 1) return "It is a draw ";
+        else if (cache[points[winnerIndex]] >= 0) return "player " + (winnerIndex + 1) + " is the winner";
+        else return "No winners..";
+    }
+
+    static checkWinner(table: TTable) {
+        if (table["gameMode"] == "21") return Dealer.winnerOf21(table);
+        else return "no game";
     }
 }
 
-let table1 = Dealer.startGame(4);
-console.log(table1);
+let table1 = Dealer.startGame(1, "poker");
+let table2 = Dealer.startGame(3, "21");
+
+Dealer.printTableInformation(table1);
+console.log(Dealer.checkWinner(table1));
+
+Dealer.printTableInformation(table2);
+console.log(Dealer.checkWinner(table2));
